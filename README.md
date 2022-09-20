@@ -32,49 +32,7 @@ There are 2 sample config files in config folder to run Sink and Source connecto
 
 ## Run the GridDB sink/source connector with the sample config file
 
-Please refer to docs/GridDB-kafka-sink-connect-and-source-connect-guide.md.
-
-# Config parameters for sink connector in the config file
-
-|Parameter   | Description  | Default Value   |
-|---|---|---|
-|connector.class|the sink connector class|com.github.griddb.GriddbSinkConnector|
-|name|the connector name|   |
-|topics.regex|the list of topics format is used by the sink connector|   |
-|topics|the name of topics is used by the sink connector|   |
-|host|GridDB host (can use with both multicast and master node mode)|   |
-|port|GridDB port (can use with both multicast and master node mode)|   |
-|cluster.name|GridDB cluster name|   |
-|user|GridDB username|   |
-|password|GridDB user password|   |
-|notification.member|GridDB notification member list in fix list method|   |
-|notification.provider.url|GridDB notification provider url in provider method|   |
-|batch.size|the size of write buffer to GridDB|3000|
-|multiput|using multiput or single put in write buffer|true|
-|container.name.format|using it to change the topic name from GridDB container|$(topic): The default container name is topic name |
-
-In file config/griddb-sink.properties : the config values (connector.class, name, topics.regex, transforms) is the properties use by Kafka, not the connector).
-
-# Config parameters for source connector in the config file
-
-|Parameter   | Description  | Default Value   |
-|---|---|---|
-|connector.class|the source connector class|com.github.griddb.GriddbSourceConnector|
-|name|the connector name|   |
-|host|GridDB host (can use with both multicast and master node mode)|   |
-|port|GridDB port (can use with both multicast and master node mode)|   |
-|cluster.name|GridDB cluster name|   |
-|user|GridDB username|   |
-|password|GridDB user password|   |
-|notification.member|GridDB notification member list in fix list method|   |
-|notification.provider.url|GridDB notification provider url in provider method|   |
-|containers|list of GridDB containers used by the source connector|   |
-|mode|the mode to import (bulk/timestamp)|   |
-|timestamp.column.name|the list of timestamp column in timestamp mode|   |
-|topic.prefix|the prefix of output topic|   |
-|mode|the mode to import (bulk/timestamp)|   |
-
-In file config/griddb-source.properties : the config values (connector.class, name is the properties used by Kafka, not the connector).
+Please refer to ["Using Apache Kafka with GridDB database"](docs/GridDB-kafka-sink-connect-and-source-connect-guide.md).
 
 # Function
 
