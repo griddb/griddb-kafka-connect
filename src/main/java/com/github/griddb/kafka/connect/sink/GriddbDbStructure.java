@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 TOSHIBA Digital Solutions Corporation
  * Copyright 2016 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,218 +15,200 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink;
+package com.github.griddb.kafka.connect.sink;
 
-import org.apache.kafka.connect.errors.ConnectException;
+import java.sql.Blob;
+import java.sql.SQLException;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import javax.sql.rowset.serial.SerialBlob;
+import javax.sql.rowset.serial.SerialException;
+
+import com.github.griddb.kafka.connect.dialect.DbDialect;
+import com.toshiba.mwcloud.gs.ColumnInfo;
+import com.toshiba.mwcloud.gs.Container;
+import com.toshiba.mwcloud.gs.ContainerInfo;
+import com.toshiba.mwcloud.gs.GSException;
+import com.toshiba.mwcloud.gs.GSType;
+import com.toshiba.mwcloud.gs.Row;
+
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+/**
+ * Griddb database structure
+ */
+public class GriddbDbStructure implements DatabaseStructure {
+    private static final Logger LOG = LoggerFactory.getLogger(GriddbDbStructure.class);
 
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.sink.metadata.FieldsMetadata;
-import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
-import io.confluent.connect.jdbc.util.TableDefinition;
-import io.confluent.connect.jdbc.util.TableDefinitions;
-import io.confluent.connect.jdbc.util.TableId;
+    private DbDialect dialect;
 
-public class DbStructure {
-  private static final Logger log = LoggerFactory.getLogger(DbStructure.class);
+    @Override
+    public Container<?, Row> getContainer(String containerName) throws GSException {
+        return this.dialect.getContainer(containerName);
+    }
 
-  private final DatabaseDialect dbDialect;
-  private final TableDefinitions tableDefns;
+    public GriddbDbStructure(DbDialect dialect) {
+        this.dialect = dialect;
+    }
 
-  public DbStructure(DatabaseDialect dbDialect) {
-    this.dbDialect = dbDialect;
-    this.tableDefns = new TableDefinitions(dbDialect);
-  }
-
-  /**
-   * @return whether a DDL operation was performed
-   * @throws SQLException if a DDL operation was deemed necessary but failed
-   */
-  public boolean createOrAmendIfNecessary(
-      final JdbcSinkConfig config,
-      final Connection connection,
-      final TableId tableId,
-      final FieldsMetadata fieldsMetadata
-  ) throws SQLException {
-    if (tableDefns.get(connection, tableId) == null) {
-      // Table does not yet exist, so attempt to create it ...
-      try {
-        create(config, connection, tableId, fieldsMetadata);
-      } catch (SQLException sqle) {
-        log.warn("Create failed, will attempt amend if table already exists", sqle);
-        try {
-          TableDefinition newDefn = tableDefns.refresh(connection, tableId);
-          if (newDefn == null) {
-            throw sqle;
-          }
-        } catch (SQLException e) {
-          throw sqle;
+    /**
+     * Create container
+     * @param config         the config parameters
+     * @param containerName  the container name
+     * @param fieldsMetadata Kafka fields information
+     * @throws GSException
+     */
+    @Override
+    public void createContainer(String containerName, FieldsMetadata fieldsMetadata)
+            throws GSException {
+        ContainerInfo containerInfo = this.getContainerInfo(containerName);
+        if (containerInfo == null) {
+            LOG.debug("Not found container with name {}", containerName);
+            create(containerName, fieldsMetadata);
+        } else {
+            LOG.debug("Found container with name {}", containerName);
         }
-      }
-    }
-    return amendIfNecessary(config, connection, tableId, fieldsMetadata, config.maxRetries);
-  }
-
-  /**
-   * @throws SQLException if CREATE failed
-   */
-  void create(
-      final JdbcSinkConfig config,
-      final Connection connection,
-      final TableId tableId,
-      final FieldsMetadata fieldsMetadata
-  ) throws SQLException {
-    if (!config.autoCreate) {
-      throw new ConnectException(
-          String.format("Table %s is missing and auto-creation is disabled", tableId)
-      );
-    }
-    String sql = dbDialect.buildCreateTableStatement(tableId, fieldsMetadata.allFields.values());
-    log.info("Creating table with sql: {}", sql);
-    dbDialect.applyDdlStatements(connection, Collections.singletonList(sql));
-  }
-
-  /**
-   * @return whether an ALTER was successfully performed
-   * @throws SQLException if ALTER was deemed necessary but failed
-   */
-  boolean amendIfNecessary(
-      final JdbcSinkConfig config,
-      final Connection connection,
-      final TableId tableId,
-      final FieldsMetadata fieldsMetadata,
-      final int maxRetries
-  ) throws SQLException {
-    // NOTE:
-    //   The table might have extra columns defined (hopefully with default values), which is not
-    //   a case we check for here.
-    //   We also don't check if the data types for columns that do line-up are compatible.
-
-    final TableDefinition tableDefn = tableDefns.get(connection, tableId);
-
-    // FIXME: SQLite JDBC driver seems to not always return the PK column names?
-    //    if (!tableMetadata.getPrimaryKeyColumnNames().equals(fieldsMetadata.keyFieldNames)) {
-    //      throw new ConnectException(String.format(
-    //          "Table %s has different primary key columns - database (%s), desired (%s)",
-    //          tableName, tableMetadata.getPrimaryKeyColumnNames(), fieldsMetadata.keyFieldNames
-    //      ));
-    //    }
-
-    final Set<SinkRecordField> missingFields = missingFields(
-        fieldsMetadata.allFields.values(),
-        tableDefn.columnNames()
-    );
-
-    if (missingFields.isEmpty()) {
-      return false;
     }
 
-    for (SinkRecordField missingField: missingFields) {
-      if (!missingField.isOptional() && missingField.defaultValue() == null) {
-        throw new ConnectException(
-            "Cannot ALTER to add missing field " + missingField
-            + ", as it is not optional and does not have a default value"
-        );
-      }
+    /**
+     * Get container info
+     * @param containerName the container name
+     * @return              container object
+     * @throws GSException
+     */
+    @Override
+    public ContainerInfo getContainerInfo(String containerName) throws GSException {
+        return this.dialect.getContainerInfo(containerName);
     }
 
-    if (!config.autoEvolve) {
-      throw new ConnectException(String.format(
-          "Table %s is missing fields (%s) and auto-evolution is disabled",
-          tableId,
-          missingFields
-      ));
+    /**
+     * Create row
+     * @param container      the Container object
+     * @param containerInfo  the ContainerInfo object
+     * @param fieldsMetadata Kafka fields object
+     * @param record         The sink record
+     * @return               the Griddb row
+     * @throws GSException
+     */
+    @Override
+    public Row createRow(Container<?, Row> container, ContainerInfo containerInfo, FieldsMetadata fieldsMetadata,
+            SinkRecord record) throws GSException {
+        int columnCount = containerInfo.getColumnCount();
+        Map<String, SinkRecordField> allFields = fieldsMetadata.getAllFields();
+        if (allFields.values().size() != columnCount) {
+            throw new GSException("Number fields of Kafka record is different with container");
+        }
+        Row row = container.createRow();
+        int index = 0;
+
+        for (String fieldName : fieldsMetadata.getFieldNames()) {
+            final Field field = record.valueSchema().field(fieldName);
+            ColumnInfo columnInfo = containerInfo.getColumnInfo(index);
+            GSType gsType = columnInfo.getType();
+            Object value = ((Struct) record.value()).get(field);
+            if (value == null) {
+                row.setNull(index);
+                continue;
+            }
+            switch (gsType) {
+                case STRING:
+                    row.setString(index, (String) value);
+                    break;
+                case BOOL:
+                    row.setBool(index, (Boolean) value);
+                    break;
+                case BYTE:
+                    row.setByte(index, (Byte) value);
+                    break;
+                case SHORT:
+                    row.setShort(index, (Short) value);
+                    break;
+                case INTEGER:
+                    row.setInteger(index, (Integer) value);
+                    break;
+                case LONG:
+                    row.setLong(index, (Long) value);
+                    break;
+                case FLOAT:
+                    Float floatValue = (Float) value;
+                    row.setFloat(index, floatValue.floatValue());
+                    break;
+                case DOUBLE:
+                    Double doubleValue = (Double) value;
+                    row.setDouble(index, doubleValue.doubleValue());
+                    break;
+                case TIMESTAMP:
+                    Date dateObject = null;
+                    try {
+                        dateObject = (Date) value;
+                    } catch (ClassCastException e) {
+                        throw new GSException(e);
+                    }
+                    row.setTimestamp(index, dateObject);
+                    break;
+                case BLOB:
+                    final byte[] bytes = (byte[]) value;
+                    Blob blob;
+                    try {
+                        blob = new SerialBlob(bytes);
+                    } catch (SerialException e) {
+                        throw new GSException(e);
+                    } catch (SQLException e) {
+                        throw new GSException(e);
+                    }
+                    row.setBlob(index, blob);
+                    break;
+                default:
+                    // Throw error
+                    throw new GSException("Type is not support: " + gsType);
+            }
+            index++;
+        }
+        return row;
     }
 
-    final List<String> amendTableQueries = dbDialect.buildAlterTable(tableId, missingFields);
-    log.info(
-        "Amending table to add missing fields:{} maxRetries:{} with SQL: {}",
-        missingFields,
-        maxRetries,
-        amendTableQueries
-    );
-    try {
-      dbDialect.applyDdlStatements(connection, amendTableQueries);
-    } catch (SQLException sqle) {
-      if (maxRetries <= 0) {
-        throw new ConnectException(
-            String.format(
-                "Failed to amend table '%s' to add missing fields: %s",
-                tableId,
-                missingFields
-            ),
-            sqle
-        );
-      }
-      log.warn("Amend failed, re-attempting", sqle);
-      tableDefns.refresh(connection, tableId);
-      // Perhaps there was a race with other tasks to add the columns
-      return amendIfNecessary(
-          config,
-          connection,
-          tableId,
-          fieldsMetadata,
-          maxRetries - 1
-      );
+    /**
+     * Put container
+     * @param containerName  the container names
+     * @param fieldsMetadata Kafka fields object
+     * @throws GSException
+     */
+    private void create(final String containerName, final FieldsMetadata fieldsMetadata)
+            throws GSException {
+        LOG.info("Put container with name {}", containerName);
+        Map<String, SinkRecordField> allFields = fieldsMetadata.getAllFields();
+        this.dialect.putContainer(containerName, allFields.values());
     }
 
-    tableDefns.refresh(connection, tableId);
-    return true;
-  }
-
-  Set<SinkRecordField> missingFields(
-      Collection<SinkRecordField> fields,
-      Set<String> dbColumnNames
-  ) {
-    final Set<SinkRecordField> missingFields = new HashSet<>();
-    for (SinkRecordField field : fields) {
-      if (!dbColumnNames.contains(field.name())) {
-        log.debug("Found missing field: {}", field);
-        missingFields.add(field);
-      }
+    /**
+     * Put row to database
+     * @param container the container object
+     * @param row       the row
+     * @throws GSException
+     */
+    @Override
+    public void putRow(Container<?, Row> container, Row row) throws GSException {
+        if (container != null) {
+            this.dialect.putRow(container, row);
+        }
     }
 
-    if (missingFields.isEmpty()) {
-      return missingFields;
+    /**
+     * Put multi rows to database
+     * @param container the container
+     * @param rows      list rows
+     * @throws GSException
+     */
+    @Override
+    public void putRows(Container<?, Row> container, List<Row> rows) throws GSException {
+        if (container != null) {
+            this.dialect.putRows(container, rows);
+        }
     }
-
-    // check if the missing fields can be located by ignoring case
-    Set<String> columnNamesLowerCase = new HashSet<>();
-    for (String columnName: dbColumnNames) {
-      columnNamesLowerCase.add(columnName.toLowerCase());
-    }
-
-    if (columnNamesLowerCase.size() != dbColumnNames.size()) {
-      log.warn(
-          "Table has column names that differ only by case. Original columns={}",
-          dbColumnNames
-      );
-    }
-
-    final Set<SinkRecordField> missingFieldsIgnoreCase = new HashSet<>();
-    for (SinkRecordField missing: missingFields) {
-      if (!columnNamesLowerCase.contains(missing.name().toLowerCase())) {
-        missingFieldsIgnoreCase.add(missing);
-      }
-    }
-
-    if (missingFieldsIgnoreCase.size() > 0) {
-      log.info(
-          "Unable to find fields {} among column names {}",
-          missingFieldsIgnoreCase,
-          dbColumnNames
-      );
-    }
-
-    return missingFieldsIgnoreCase;
-  }
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  **/
 
-package io.confluent.connect.jdbc.source;
+package com.github.griddb.kafka.connect.source;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,29 +24,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TimestampIncrementingOffset {
-  private static final Logger log = LoggerFactory.getLogger(JdbcSourceTask.class);
-
-  private static final String INCREMENTING_FIELD = "incrementing";
+  private static final Logger LOG = LoggerFactory.getLogger(TimestampIncrementingOffset.class);
   private static final String TIMESTAMP_FIELD = "timestamp";
   private static final String TIMESTAMP_NANOS_FIELD = "timestamp_nanos";
 
-  private final Long incrementingOffset;
   private final Timestamp timestampOffset;
 
   /**
-   * @param timestampOffset the timestamp offset.
-   *                        If null, {@link #getTimestampOffset()} will return
-   *                        {@code new Timestamp(0)}.
-   * @param incrementingOffset the incrementing offset.
-   *                           If null, {@link #getIncrementingOffset()} will return -1.
+   * @param timestampOffset timestamp offset
    */
-  public TimestampIncrementingOffset(Timestamp timestampOffset, Long incrementingOffset) {
+  public TimestampIncrementingOffset(Timestamp timestampOffset) {
     this.timestampOffset = timestampOffset;
-    this.incrementingOffset = incrementingOffset;
-  }
-
-  public long getIncrementingOffset() {
-    return incrementingOffset == null ? -1 : incrementingOffset;
   }
 
   public Timestamp getTimestampOffset() {
@@ -54,10 +42,7 @@ public class TimestampIncrementingOffset {
   }
 
   public Map<String, Object> toMap() {
-    Map<String, Object> map = new HashMap<>(3);
-    if (incrementingOffset != null) {
-      map.put(INCREMENTING_FIELD, incrementingOffset);
-    }
+    Map<String, Object> map = new HashMap<>();
     if (timestampOffset != null) {
       map.put(TIMESTAMP_FIELD, timestampOffset.getTime());
       map.put(TIMESTAMP_NANOS_FIELD, (long) timestampOffset.getNanos());
@@ -67,50 +52,21 @@ public class TimestampIncrementingOffset {
 
   public static TimestampIncrementingOffset fromMap(Map<String, ?> map) {
     if (map == null || map.isEmpty()) {
-      return new TimestampIncrementingOffset(null, null);
+      return new TimestampIncrementingOffset(null);
     }
 
-    Long incr = (Long) map.get(INCREMENTING_FIELD);
     Long millis = (Long) map.get(TIMESTAMP_FIELD);
     Timestamp ts = null;
     if (millis != null) {
-      log.trace("millis is not null");
+      LOG.trace("millis is not null");
       ts = new Timestamp(millis);
       Long nanos = (Long) map.get(TIMESTAMP_NANOS_FIELD);
       if (nanos != null) {
-        log.trace("Nanos is not null");
+        LOG.trace("Nanos is not null");
         ts.setNanos(nanos.intValue());
       }
     }
-    return new TimestampIncrementingOffset(ts, incr);
+    return new TimestampIncrementingOffset(ts);
   }
 
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-
-    TimestampIncrementingOffset that = (TimestampIncrementingOffset) o;
-
-    if (incrementingOffset != null
-        ? !incrementingOffset.equals(that.incrementingOffset)
-        : that.incrementingOffset != null) {
-      return false;
-    }
-    return timestampOffset != null
-           ? timestampOffset.equals(that.timestampOffset)
-           : that.timestampOffset == null;
-
-  }
-
-  @Override
-  public int hashCode() {
-    int result = incrementingOffset != null ? incrementingOffset.hashCode() : 0;
-    result = 31 * result + (timestampOffset != null ? timestampOffset.hashCode() : 0);
-    return result;
-  }
 }

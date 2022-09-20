@@ -1,4 +1,5 @@
-/**
+/*
+ * Copyright (c) 2021 TOSHIBA Digital Solutions Corporation
  * Copyright 2015 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,159 +13,179 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **/
+ */
 
-package io.confluent.connect.jdbc.source;
+package com.github.griddb.kafka.connect.source;
+
+import com.github.griddb.kafka.connect.dialect.DbDialect;
+import com.toshiba.mwcloud.gs.ContainerInfo;
+import com.toshiba.mwcloud.gs.GSException;
+import com.toshiba.mwcloud.gs.Row;
+import com.toshiba.mwcloud.gs.RowSet;
 
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.util.TableId;
-
 /**
- * TableQuerier executes queries against a specific table. Implementations handle different types
- * of queries: periodic bulk loading, incremental loads using auto incrementing IDs, incremental
- * loads using timestamps, etc.
+ * ContainerQuerier: the container querier to get all data from Griddb container
  */
-abstract class TableQuerier implements Comparable<TableQuerier> {
-  public enum QueryMode {
-    TABLE, // Copying whole tables, with queries constructed automatically
-    QUERY // User-specified query
-  }
+@SuppressWarnings("PMD.AbstractNaming")
+abstract class ContainerQuerier implements Comparable<ContainerQuerier> {
 
-  private final Logger log = LoggerFactory.getLogger(TableQuerier.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ContainerQuerier.class);
 
-  protected final DatabaseDialect dialect;
-  protected final QueryMode mode;
-  protected final String query;
-  protected final String topicPrefix;
-  protected final TableId tableId;
+    protected long lastUpdate;
+    protected final String containerName;
+    protected final DbDialect dialect;
+    protected final String topicPrefix;
+    protected RowSet<Row> rowset;
+    private String loggedQueryString;
 
-  // Mutable state
+    protected ContainerInfo containerInfo;
+    protected SchemaMapping schemaMapping;
 
-  protected long lastUpdate;
-  protected Connection db;
-  protected PreparedStatement stmt;
-  protected ResultSet resultSet;
-  protected SchemaMapping schemaMapping;
-  private String loggedQueryString;
-
-  public TableQuerier(
-      DatabaseDialect dialect,
-      QueryMode mode,
-      String nameOrQuery,
-      String topicPrefix
-  ) {
-    this.dialect = dialect;
-    this.mode = mode;
-    this.tableId = mode.equals(QueryMode.TABLE) ? dialect.parseTableIdentifier(nameOrQuery) : null;
-    this.query = mode.equals(QueryMode.QUERY) ? nameOrQuery : null;
-    this.topicPrefix = topicPrefix;
-    this.lastUpdate = 0;
-  }
-
-  public long getLastUpdate() {
-    return lastUpdate;
-  }
-
-  public PreparedStatement getOrCreatePreparedStatement(Connection db) throws SQLException {
-    if (stmt != null) {
-      return stmt;
+    /**
+     * The constructor method
+     * 
+     * @param dialect       the database dialect
+     * @param containerName the container name
+     * @param topicPrefix   the Kafka topic prefix
+     */
+    public ContainerQuerier(DbDialect dialect, String containerName, String topicPrefix) {
+        this.dialect = dialect;
+        this.containerName = containerName;
+        this.topicPrefix = topicPrefix;
+        this.lastUpdate = 0;
     }
-    createPreparedStatement(db);
-    return stmt;
-  }
 
-  protected abstract void createPreparedStatement(Connection db) throws SQLException;
-
-  public boolean querying() {
-    return resultSet != null;
-  }
-
-  public void maybeStartQuery(Connection db) throws SQLException {
-    if (resultSet == null) {
-      this.db = db;
-      stmt = getOrCreatePreparedStatement(db);
-      resultSet = executeQuery();
-      String schemaName = tableId != null ? tableId.tableName() : null; // backwards compatible
-      schemaMapping = SchemaMapping.create(schemaName, resultSet.getMetaData(), dialect);
+    /**
+     * Support sort CotainerQuerier objects
+     */
+    @Override
+    public int compareTo(ContainerQuerier other) {
+        if (this.lastUpdate < other.lastUpdate) {
+            return -1;
+        } else if (this.lastUpdate > other.lastUpdate) {
+            return 1;
+        }
+        return this.containerName.compareTo(other.containerName);
     }
-  }
 
-  protected abstract ResultSet executeQuery() throws SQLException;
-
-  public boolean next() throws SQLException {
-    return resultSet.next();
-  }
-
-  public abstract SourceRecord extractRecord() throws SQLException;
-
-  public void reset(long now) {
-    closeResultSetQuietly();
-    closeStatementQuietly();
-    releaseLocksQuietly();
-    // TODO: Can we cache this and quickly check that it's identical for the next query
-    // instead of constructing from scratch since it's almost always the same
-    schemaMapping = null;
-    lastUpdate = now;
-  }
-
-  private void releaseLocksQuietly() {
-    if (db != null) {
-      try {
-        db.commit();
-      } catch (SQLException e) {
-        log.warn("Error while committing read transaction, database locks may still be held", e);
-      }
+    /**
+     * Get the last time when the querier is updated
+     * 
+     * @return long
+     */
+    public long getLastUpdate() {
+        return lastUpdate;
     }
-    db = null;
-  }
 
-  private void closeStatementQuietly() {
-    if (stmt != null) {
-      try {
-        stmt.close();
-      } catch (SQLException ignored) {
-        // intentionally ignored
-      }
-    }
-    stmt = null;
-  }
+    /**
+     * Create Kafka source event base on row data
+     * 
+     * @return SourceRecord
+     * @throws GSException
+     */
+    public abstract SourceRecord extractRecord() throws GSException;
 
-  private void closeResultSetQuietly() {
-    if (resultSet != null) {
-      try {
-        resultSet.close();
-      } catch (SQLException ignored) {
-        // intentionally ignored
-      }
+    /**
+     * Reset data of querier
+     * 
+     * @param now
+     */
+    public void reset(long now) {
+        this.closeRowSet();
+        schemaMapping = null;
+        lastUpdate = now;
     }
-    resultSet = null;
-  }
 
-  protected void recordQuery(String query) {
-    if (query != null && !query.equals(loggedQueryString)) {
-      // For usability, log the statement at INFO level only when it changes
-      log.info("Begin using SQL query: {}", query);
-      loggedQueryString = query;
-    }
-  }
+    /**
+     * Create TQL statement to get data
+     */
+    public abstract String createQueryStatement();
 
-  @Override
-  public int compareTo(TableQuerier other) {
-    if (this.lastUpdate < other.lastUpdate) {
-      return -1;
-    } else if (this.lastUpdate > other.lastUpdate) {
-      return 1;
-    } else {
-      return this.tableId.compareTo(other.tableId);
+    /**
+     * Get RowSet object
+     * 
+     * @return RowSet
+     * @throws GSException
+     */
+    public RowSet<Row> getRowSet() throws GSException {
+        String tql = this.createQueryStatement();
+        return this.dialect.getRowSet(this.containerName, tql);
     }
-  }
+
+    /**
+     * Check the querier has next data
+     * 
+     * @return
+     * @throws GSException
+     */
+    public boolean hasNext() throws GSException {
+        if (rowset != null) {
+            return rowset.hasNext();
+        }
+        return false;
+    }
+
+    /**
+     * Prepare to query data
+     * 
+     * @throws GSException
+     */
+    public void startQuery() throws GSException {
+        if (rowset == null) {
+            rowset = getRowSet();
+            if (this.containerInfo == null) {
+                this.containerInfo = this.dialect.getContainerInfo(this.containerName);
+            }
+            schemaMapping = SchemaMapping.create(this.containerName, this.containerInfo, dialect);
+        }
+    }
+
+    /**
+     * Close RowSet object
+     */
+    private void closeRowSet() {
+        if (rowset != null) {
+            try {
+                rowset.close();
+            } catch (GSException e) {
+                // Print stack trace for supporting debug
+                e.printStackTrace();
+            }
+        }
+        rowset = null;
+    }
+
+    /**
+     * Support check TQL string in debug mode
+     * 
+     * @param tql
+     */
+    protected void recordQuery(String tql) {
+        if (tql != null && !tql.equals(loggedQueryString)) {
+            // For usability, log the statement at DEBUG level only when it changes
+            LOG.debug("Begin using DEBUG query: {}", tql);
+            loggedQueryString = tql;
+        }
+    }
+
+    /**
+     * Get row data
+     */
+    protected Row getRow() throws GSException {
+        return this.rowset.next();
+    }
+
+    /**
+     * Check the querier is getting data
+     * 
+     * @return
+     */
+    public boolean querying() {
+        return this.rowset != null;
+    }
+
 }

@@ -14,89 +14,65 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink;
+package com.github.griddb.kafka.connect.sink;
+
+import com.github.griddb.kafka.connect.dialect.DbDialect;
+import com.github.griddb.kafka.connect.dialect.GriddbDatabaseDialect;
+import com.github.griddb.kafka.connect.util.Utility;
+import com.toshiba.mwcloud.gs.GSException;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Map;
 
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.dialect.DatabaseDialects;
+public class GriddbSinkTask extends SinkTask {
+  private static final Logger LOG = LoggerFactory.getLogger(GriddbSinkTask.class);
+  private static final String DEFAULT_VERSION = "Unknown";
 
-public class JdbcSinkTask extends SinkTask {
-  private static final Logger log = LoggerFactory.getLogger(JdbcSinkTask.class);
-
-  DatabaseDialect dialect;
-  JdbcSinkConfig config;
-  JdbcDbWriter writer;
-  int remainingRetries;
+  private DbDialect dialect;
+  private DbWriter writer;
+  private GriddbSinkConnectorConfig config;
 
   @Override
   public void start(final Map<String, String> props) {
-    log.info("Starting JDBC Sink task");
-    config = new JdbcSinkConfig(props);
+    LOG.info("Starting GridDB Sink task");
+    config = new GriddbSinkConnectorConfig(props);
     initWriter();
-    remainingRetries = config.maxRetries;
   }
 
   void initWriter() {
-    if (config.dialectName != null && !config.dialectName.trim().isEmpty()) {
-      dialect = DatabaseDialects.create(config.dialectName, config);
-    } else {
-      dialect = DatabaseDialects.findBestFor(config.connectionUrl, config);
-    }
-    final DbStructure dbStructure = new DbStructure(dialect);
-    log.info("Initializing writer using SQL dialect: {}", dialect.getClass().getSimpleName());
-    writer = new JdbcDbWriter(config, dialect, dbStructure);
+    dialect = new GriddbDatabaseDialect(config);
+    final DatabaseStructure dbStructure = new GriddbDbStructure(dialect);
+    LOG.info("Initializing writer using GridDB dialect: {}", dialect.getClass().getSimpleName());
+    writer = new GriddbDbWriter(config, dbStructure);
   }
 
   @Override
   public void put(Collection<SinkRecord> records) {
+    LOG.info("Put records to GridDB with number records {}", records.size());
     if (records.isEmpty()) {
       return;
     }
     final SinkRecord first = records.iterator().next();
     final int recordsCount = records.size();
-    log.debug(
-        "Received {} records. First record kafka coordinates:({}-{}-{}). Writing them to the "
-        + "database...",
-        recordsCount, first.topic(), first.kafkaPartition(), first.kafkaOffset()
+    LOG.debug(
+      "Received {} records. First record kafka coordinates:({}-{}-{}). Writing them to the " + "database...",
+      recordsCount, first.topic(), first.kafkaPartition(), first.kafkaOffset()
     );
     try {
       writer.write(records);
-    } catch (SQLException sqle) {
-      log.warn(
-          "Write of {} records failed, remainingRetries={}",
-          records.size(),
-          remainingRetries,
-          sqle
-      );
-      String sqleAllMessages = "Exception chain:" + System.lineSeparator();
-      for (Throwable e : sqle) {
-        sqleAllMessages += e + System.lineSeparator();
-      }
-      SQLException sqlAllMessagesException = new SQLException(sqleAllMessages);
-      sqlAllMessagesException.setNextException(sqle);
-      if (remainingRetries == 0) {
-        throw new ConnectException(sqlAllMessagesException);
-      } else {
-        writer.closeQuietly();
-        initWriter();
-        remainingRetries--;
-        context.timeout(config.retryBackoffMs);
-        throw new RetriableException(sqlAllMessagesException);
-      }
+    } catch (GSException ex) {
+      LOG.info("GSException with error message {}, error code {}", ex.getMessage(), ex.getErrorCode());
+      throw new ConnectException(ex);
     }
-    remainingRetries = config.maxRetries;
+
   }
 
   @Override
@@ -104,26 +80,12 @@ public class JdbcSinkTask extends SinkTask {
     // Not necessary
   }
 
-  public void stop() {
-    log.info("Stopping task");
-    try {
-      writer.closeQuietly();
-    } finally {
-      try {
-        if (dialect != null) {
-          dialect.close();
-        }
-      } catch (Throwable t) {
-        log.warn("Error while closing the {} dialect: ", dialect.name(), t);
-      } finally {
-        dialect = null;
-      }
-    }
-  }
-
   @Override
-  public String version() {
-    return getClass().getPackage().getImplementationVersion();
+  public void stop() {
+    // Do nothing
   }
 
+  public String version() {
+    return Utility.getConfigString("sink_task_version", DEFAULT_VERSION);
+  }
 }

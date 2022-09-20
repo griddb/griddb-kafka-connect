@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 TOSHIBA Digital Solutions Corporation
  * Copyright 2018 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,48 +15,41 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc.source;
-
-import io.confluent.connect.jdbc.util.ExpressionBuilder;
-import io.confluent.connect.jdbc.util.QuoteMethod;
-import io.confluent.connect.jdbc.util.TableId;
+package com.github.griddb.kafka.connect.source;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Provides helper methods to get partition map for different protocol versions.
+ * Support to get Kafka event offset
  */
+@SuppressWarnings({ "PMD.LongVariable", "PMD.ClassNamingConventions" })
 public class OffsetProtocols {
 
-  /**
-   * Provides the partition map for V1 protocol. The table name included is fully qualified
-   * and there is also an explicit protocol key.
-   * @param tableId the tableId that requires partition keys
-   * @return the partition map for V1 protocol
-   */
-  public static Map<String, String> sourcePartitionForProtocolV1(TableId tableId) {
-    String fqn = ExpressionBuilder.create().append(tableId, QuoteMethod.NEVER).toString();
-    Map<String, String> partitionForV1 = new HashMap<>();
-    partitionForV1.put(JdbcSourceConnectorConstants.TABLE_NAME_KEY, fqn);
-    partitionForV1.put(
-        JdbcSourceConnectorConstants.OFFSET_PROTOCOL_VERSION_KEY,
-        JdbcSourceConnectorConstants.PROTOCOL_VERSION_ONE
-    );
-    return partitionForV1;
-  }
+    private static final String CONTAINER_NAME_KEY = "container";
 
-  /**
-   * Provides the partition map for V0 protocol. The table name included is unqualified
-   * and there is no explicit protocol key.
-   * @param tableId the tableId that requires partition keys
-   * @return the partition map for V0 protocol
-   */
-  public static Map<String, String> sourcePartitionForProtocolV0(TableId tableId) {
-    return Collections.singletonMap(
-        JdbcSourceConnectorConstants.TABLE_NAME_KEY,
-        tableId.tableName()
-    );
-  }
+    private static final String OFFSET_PROTOCOL_VERSION_KEY = "protocol";
+    private static final String PROTOCOL_VERSION_ONE = "1";
+
+    /**
+     *  Provides the partition map for V1 protocol.
+     */
+    public static Map<String, String> sourcePartitionForProtocolV1(String container) {
+        Map<String, String> partitionForV1 = new HashMap<>();
+        partitionForV1.put(CONTAINER_NAME_KEY, container);
+        partitionForV1.put(OFFSET_PROTOCOL_VERSION_KEY, PROTOCOL_VERSION_ONE);
+        return partitionForV1;
+    }
+
+    /**
+     * Provides the partition map for V0 protocol. The table name included is
+     * unqualified and there is no explicit protocol key.
+     *
+     * @param container container name
+     * @return the partition map for V0 protocol
+     */
+    public static Map<String, String> sourcePartitionForProtocolV0(String container) {
+        return Collections.singletonMap(CONTAINER_NAME_KEY, container);
+    }
 }

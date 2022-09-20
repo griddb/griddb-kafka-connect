@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink.metadata;
+package com.github.griddb.kafka.connect.sink;
 
 import org.apache.kafka.connect.data.Schema;
 

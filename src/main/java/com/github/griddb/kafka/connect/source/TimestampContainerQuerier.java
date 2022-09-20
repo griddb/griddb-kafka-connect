@@ -1,4 +1,5 @@
-/**
+/*
+ * Copyright (c) 2021 TOSHIBA Digital Solutions Corporation
  * Copyright 2015 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,221 +13,146 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- **/
+ */
 
-package io.confluent.connect.jdbc.source;
+package com.github.griddb.kafka.connect.source;
 
-import java.util.TimeZone;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.errors.DataException;
-import org.apache.kafka.connect.source.SourceRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.source.SchemaMapping.FieldSetter;
-import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria.CriteriaValues;
-import io.confluent.connect.jdbc.util.ColumnDefinition;
-import io.confluent.connect.jdbc.util.ColumnId;
-import io.confluent.connect.jdbc.util.DateTimeUtils;
-import io.confluent.connect.jdbc.util.ExpressionBuilder;
+import com.github.griddb.kafka.connect.dialect.DbDialect;
+import com.github.griddb.kafka.connect.util.ColumnId;
+import com.toshiba.mwcloud.gs.ColumnInfo;
+import com.toshiba.mwcloud.gs.GSException;
+import com.toshiba.mwcloud.gs.GSType;
+import com.toshiba.mwcloud.gs.Row;
+
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * <p>
- *   TimestampIncrementingTableQuerier performs incremental loading of data using two mechanisms: a
- *   timestamp column provides monotonically incrementing values that can be used to detect new or
- *   modified rows and a strictly incrementing (e.g. auto increment) column allows detecting new
- *   rows or combined with the timestamp provide a unique identifier for each update to the row.
- * </p>
- * <p>
- *   At least one of the two columns must be specified (or left as "" for the incrementing column
- *   to indicate use of an auto-increment column). If both columns are provided, they are both
- *   used to ensure only new or updated rows are reported and to totally order updates so
- *   recovery can occur no matter when offsets were committed. If only the incrementing fields is
- *   provided, new rows will be detected but not updates. If only the timestamp field is
- *   provided, both new and updated rows will be detected, but stream offsets will not be unique
- *   so failures may cause duplicates or losses.
- * </p>
+ * Support query with timestamp mode
  */
-public class TimestampIncrementingTableQuerier extends TableQuerier implements CriteriaValues {
-  private static final Logger log = LoggerFactory.getLogger(
-      TimestampIncrementingTableQuerier.class
-  );
+@SuppressWarnings("PMD.LongVariable")
+public class TimestampContainerQuerier extends ContainerQuerier {
 
-  private final List<String> timestampColumnNames;
-  private final List<ColumnId> timestampColumns;
-  private String incrementingColumnName;
-  private long timestampDelay;
-  private TimestampIncrementingOffset offset;
-  private TimestampIncrementingCriteria criteria;
-  private final Map<String, String> partition;
-  private final String topic;
-  private final TimeZone timeZone;
+    private static final Logger LOG = LoggerFactory.getLogger(TimestampContainerQuerier.class);
 
-  public TimestampIncrementingTableQuerier(DatabaseDialect dialect, QueryMode mode, String name,
-                                           String topicPrefix,
-                                           List<String> timestampColumnNames,
-                                           String incrementingColumnName,
-                                           Map<String, Object> offsetMap, Long timestampDelay,
-                                           TimeZone timeZone) {
-    super(dialect, mode, name, topicPrefix);
-    this.incrementingColumnName = incrementingColumnName;
-    this.timestampColumnNames = timestampColumnNames != null
-                                ? timestampColumnNames : Collections.<String>emptyList();
-    this.timestampDelay = timestampDelay;
-    this.offset = TimestampIncrementingOffset.fromMap(offsetMap);
+    private TimestampIncrementingOffset offset;
+    private TimestampIncrementingCriteria criteria;
+    private Timestamp beginTimetampValue;
+    private Timestamp endTimetampValue;
+    private final List<String> timestampColumnNames;
+    private final List<ColumnId> timestampColumns;
 
-    this.timestampColumns = new ArrayList<>();
-    for (String timestampColumn : this.timestampColumnNames) {
-      if (timestampColumn != null && !timestampColumn.isEmpty()) {
-        timestampColumns.add(new ColumnId(tableId, timestampColumn));
-      }
-    }
+    private final Map<String, String> partition;
 
-    switch (mode) {
-      case TABLE:
-        String tableName = tableId.tableName();
-        topic = topicPrefix + tableName;// backward compatible
-        partition = OffsetProtocols.sourcePartitionForProtocolV1(tableId);
-        break;
-      case QUERY:
-        partition = Collections.singletonMap(JdbcSourceConnectorConstants.QUERY_NAME_KEY,
-            JdbcSourceConnectorConstants.QUERY_NAME_VALUE);
-        topic = topicPrefix;
-        break;
-      default:
-        throw new ConnectException("Unexpected query mode: " + mode);
-    }
+    /**
+     * The constructor
+     */
+    public TimestampContainerQuerier(DbDialect dialect, String containerName, String topicPrefix,
+            List<String> timestampColumnNames, Map<String, Object> offsetMap) throws GSException {
+        super(dialect, containerName, topicPrefix);
+        this.offset = TimestampIncrementingOffset.fromMap(offsetMap);
 
-    this.timeZone = timeZone;
-  }
+        partition = OffsetProtocols.sourcePartitionForProtocolV1(containerName);
 
-  @Override
-  protected void createPreparedStatement(Connection db) throws SQLException {
-    findDefaultAutoIncrementingColumn(db);
-
-    ColumnId incrementingColumn = null;
-    if (incrementingColumnName != null && !incrementingColumnName.isEmpty()) {
-      incrementingColumn = new ColumnId(tableId, incrementingColumnName);
-    }
-
-    ExpressionBuilder builder = dialect.expressionBuilder();
-    switch (mode) {
-      case TABLE:
-        builder.append("SELECT * FROM ");
-        builder.append(tableId);
-        break;
-      case QUERY:
-        builder.append(query);
-        break;
-      default:
-        throw new ConnectException("Unknown mode encountered when preparing query: " + mode);
-    }
-
-    // Append the criteria using the columns ...
-    criteria = dialect.criteriaFor(incrementingColumn, timestampColumns);
-    criteria.whereClause(builder);
-
-    String queryString = builder.toString();
-    recordQuery(queryString);
-    log.debug("{} prepared SQL query: {}", this, queryString);
-    stmt = dialect.createPreparedStatement(db, queryString);
-  }
-
-  private void findDefaultAutoIncrementingColumn(Connection db) throws SQLException {
-    // Default when unspecified uses an autoincrementing column
-    if (incrementingColumnName != null && incrementingColumnName.isEmpty()) {
-      // Find the first auto-incremented column ...
-      for (ColumnDefinition defn : dialect.describeColumns(
-          db,
-          tableId.catalogName(),
-          tableId.schemaName(),
-          tableId.tableName(),
-          null).values()) {
-        if (defn.isAutoIncrement()) {
-          incrementingColumnName = defn.id().name();
-          break;
+        this.offset = TimestampIncrementingOffset.fromMap(offsetMap);
+        this.timestampColumnNames = timestampColumnNames != null ? timestampColumnNames
+                : Collections.<String>emptyList();
+        this.timestampColumns = new ArrayList<>();
+        this.containerInfo = this.dialect.getContainerInfo(this.containerName);
+        ColumnInfo colInfo;
+        String fieldName;
+        for (String timestampColumn : this.timestampColumnNames) {
+            if (timestampColumn == null || timestampColumn.isEmpty()) {
+                continue;
+            }
+            for (int i = 0; i < this.containerInfo.getColumnCount(); i++) {
+                colInfo = containerInfo.getColumnInfo(i);
+                fieldName = colInfo.getName();
+                if (fieldName.equals(timestampColumn) && colInfo.getType() == GSType.TIMESTAMP) {
+                    timestampColumns.add(new ColumnId(containerName, timestampColumn));
+                    break;
+                }
+            }
         }
-      }
-    }
-    // If still not found, query the table and use the result set metadata.
-    // This doesn't work if the table is empty.
-    if (incrementingColumnName != null && incrementingColumnName.isEmpty()) {
-      log.debug("Falling back to describe '{}' table by querying {}", tableId, db);
-      for (ColumnDefinition defn : dialect.describeColumnsByQuerying(db, tableId).values()) {
-        if (defn.isAutoIncrement()) {
-          incrementingColumnName = defn.id().name();
-          break;
+        if (timestampColumns.size() == 0) {
+            LOG.info("TimestampContainerQuerier : Container {} doesn't have any timestamp column in the setting",
+                    this.containerName);
+            throw new GSException("TimestampContainerQuerier doesn't have any timestamp column.");
         }
-      }
     }
-  }
 
-  @Override
-  protected ResultSet executeQuery() throws SQLException {
-    criteria.setQueryParameters(stmt, this);
-    log.trace("Statement to execute: {}", stmt.toString());
-    return stmt.executeQuery();
-  }
+    /**
+     * Create TQL statement to get data
+     */
+    @Override
+    public String createQueryStatement() {
+        StringBuilder stringbuilder = new StringBuilder();
+        stringbuilder.append("SELECT * ");
+        if (timestampColumns.size() > 0) {
+            beginTimetampValue = offset.getTimestampOffset();
+            java.util.Date currentDbTime = dialect.currentTimeOnDB();
+            endTimetampValue = new Timestamp(currentDbTime.getTime());
+            stringbuilder.append("WHERE ");
+            getFirstTimestampColumn(stringbuilder);
+            stringbuilder.append(" > ");
+            stringbuilder.append("TO_TIMESTAMP_MS(");
+            stringbuilder.append(beginTimetampValue.getTime());
+            stringbuilder.append(")");
+            stringbuilder.append(" AND ");
+            getFirstTimestampColumn(stringbuilder);
+            stringbuilder.append(" < ");
+            stringbuilder.append("TO_TIMESTAMP_MS(");
+            stringbuilder.append(endTimetampValue.getTime());
+            stringbuilder.append(") ");
+            stringbuilder.append(" ORDER BY ");
+            getFirstTimestampColumn(stringbuilder);
+            stringbuilder.append(" ASC");
+        }
 
-  @Override
-  public SourceRecord extractRecord() throws SQLException {
-    Struct record = new Struct(schemaMapping.schema());
-    for (FieldSetter setter : schemaMapping.fieldSetters()) {
-      try {
-        setter.setField(record, resultSet);
-      } catch (IOException e) {
-        log.warn("Error mapping fields into Connect record", e);
-        throw new ConnectException(e);
-      } catch (SQLException e) {
-        log.warn("SQL error mapping fields into Connect record", e);
-        throw new DataException(e);
-      }
+        criteria = dialect.criteriaFor(timestampColumns);
+        String tql = stringbuilder.toString();
+        recordQuery(tql);
+        LOG.debug("TQL using in TimestampContainerQuerier : {}", tql);
+        return tql;
     }
-    offset = criteria.extractValues(schemaMapping.schema(), record, offset);
-    return new SourceRecord(partition, offset.toMap(), topic, record.schema(), record);
-  }
 
-  @Override
-  public Timestamp beginTimetampValue() {
-    return offset.getTimestampOffset();
-  }
+    /**
+     * Create Kafka source event base on row data
+     * 
+     * @return SourceRecord
+     * @throws GSException
+     */
+    @Override
+    public SourceRecord extractRecord() throws GSException {
+        LOG.debug("Extract record from Griddb Source Connector for container {}", this.containerName);
+        Struct record = new Struct(schemaMapping.getSchema());
+        Row row = this.getRow();
+        schemaMapping.setStructRecordField(record, row);
 
-  @Override
-  public Timestamp endTimetampValue()  throws SQLException {
-    final long currentDbTime = dialect.currentTimeOnDB(
-        stmt.getConnection(),
-        DateTimeUtils.getTimeZoneCalendar(timeZone)
-    ).getTime();
-    return new Timestamp(currentDbTime - timestampDelay);
-  }
+        final String topic = this.topicPrefix + this.containerName;
 
-  @Override
-  public Long lastIncrementedValue() {
-    return offset.getIncrementingOffset();
-  }
+        offset = criteria.extractValues(schemaMapping.getSchema(), record, offset);
+        return new SourceRecord(partition, offset.toMap(), topic, record.schema(), record);
+    }
 
-  @Override
-  public String toString() {
-    return "TimestampIncrementingTableQuerier{"
-           + "table=" + tableId
-           + ", query='" + query + '\''
-           + ", topicPrefix='" + topicPrefix + '\''
-           + ", incrementingColumn='" + (incrementingColumnName != null
-                                        ? incrementingColumnName
-                                        : "") + '\''
-           + ", timestampColumns=" + timestampColumnNames
-           + '}';
-  }
+    /**
+     * Support to create the condition in TQL query string
+     * 
+     * @param builder
+     */
+    private void getFirstTimestampColumn(StringBuilder builder) {
+        if (timestampColumns.size() == 0) {
+            return;
+        }
+        builder.append(timestampColumns.get(0).getName());
+    }
+
 }

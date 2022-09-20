@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2021 TOSHIBA Digital Solutions Corporation
  * Copyright 2016 Confluent Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,81 +15,70 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink;
+package com.github.griddb.kafka.connect.sink;
 
-import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.util.CachedConnectionProvider;
-import io.confluent.connect.jdbc.util.TableId;
+import com.toshiba.mwcloud.gs.GSException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JdbcDbWriter {
-  private static final Logger log = LoggerFactory.getLogger(JdbcDbWriter.class);
+/**
+ * The Griddb database writer
+ */
+public class GriddbDbWriter implements DbWriter {
+    private static final Logger LOG = LoggerFactory.getLogger(GriddbDbWriter.class);
 
-  private final JdbcSinkConfig config;
-  private final DatabaseDialect dbDialect;
-  private final DbStructure dbStructure;
-  final CachedConnectionProvider cachedConnectionProvider;
+    private final GriddbSinkConnectorConfig config;
+    private final DatabaseStructure dbStructure;
 
-  JdbcDbWriter(final JdbcSinkConfig config, DatabaseDialect dbDialect, DbStructure dbStructure) {
-    this.config = config;
-    this.dbDialect = dbDialect;
-    this.dbStructure = dbStructure;
-
-    this.cachedConnectionProvider = new CachedConnectionProvider(this.dbDialect) {
-      @Override
-      protected void onConnect(Connection connection) throws SQLException {
-        log.info("JdbcDbWriter Connected");
-        connection.setAutoCommit(false);
-      }
-    };
-  }
-
-  void write(final Collection<SinkRecord> records) throws SQLException {
-    final Connection connection = cachedConnectionProvider.getConnection();
-
-    final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
-    for (SinkRecord record : records) {
-      final TableId tableId = destinationTable(record.topic());
-      BufferedRecords buffer = bufferByTable.get(tableId);
-      if (buffer == null) {
-        buffer = new BufferedRecords(config, tableId, dbDialect, dbStructure, connection);
-        bufferByTable.put(tableId, buffer);
-      }
-      buffer.add(record);
+    /**
+     * The constructor method
+     * @param config      the configuration parameters
+     * @param dbStructure the database structure
+     */
+    public GriddbDbWriter(final GriddbSinkConnectorConfig config, DatabaseStructure dbStructure) {
+        this.config = config;
+        this.dbStructure = dbStructure;
     }
-    for (Map.Entry<TableId, BufferedRecords> entry : bufferByTable.entrySet()) {
-      TableId tableId = entry.getKey();
-      BufferedRecords buffer = entry.getValue();
-      log.debug("Flushing records in JDBC Writer for table ID: {}", tableId);
-      buffer.flush();
-      buffer.close();
-    }
-    connection.commit();
-  }
 
-  void closeQuietly() {
-    cachedConnectionProvider.close();
-  }
+    /**
+     * Write list records to database
+     * @param records : list records
+     * @throws GSException
+     */
+    public void write(Collection<SinkRecord> records) throws GSException {
 
-  TableId destinationTable(String topic) {
-    final String tableName = config.tableNameFormat.replace("${topic}", topic);
-    if (tableName.isEmpty()) {
-      throw new ConnectException(String.format(
-          "Destination table name for topic '%s' is empty using the format string '%s'",
-          topic,
-          config.tableNameFormat
-      ));
+        final Map<String, BufferedRecords> bufferByTable = new HashMap<>();
+        for (SinkRecord record : records) {
+            final String containerName = destinationContainer(record.topic());
+            BufferedRecords buffer = bufferByTable.get(containerName);
+            if (buffer == null) {
+                buffer = new GriddbBufferedRecords(config, containerName, dbStructure);
+                bufferByTable.put(containerName, buffer);
+            }
+            buffer.add(record);
+        }
+        for (Map.Entry<String, BufferedRecords> entry : bufferByTable.entrySet()) {
+            String containerName = entry.getKey();
+            BufferedRecords buffer = entry.getValue();
+            LOG.debug("Flushing records in Griddb Writer for containerName: {}", containerName);
+            buffer.flush();
+            buffer.close();
+        }
     }
-    return dbDialect.parseTableIdentifier(tableName);
-  }
+
+    /**
+     * The container name
+     * @param topic
+     * @return
+     */
+    private String destinationContainer(String topic) {
+        return config.containerNameFormat.replace("${topic}", topic);
+    }
 }

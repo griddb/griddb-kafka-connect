@@ -14,34 +14,22 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink.metadata;
+package com.github.griddb.kafka.connect.sink;
 
 import org.apache.kafka.connect.data.Schema;
-
-import java.util.Map;
 
 public class SinkRecordField {
 
   private final Schema schema;
   private final String name;
-  private final boolean isPrimaryKey;
 
-  public SinkRecordField(Schema schema, String name, boolean isPrimaryKey) {
+  public SinkRecordField(Schema schema, String name) {
     this.schema = schema;
     this.name = name;
-    this.isPrimaryKey = isPrimaryKey;
-  }
-
-  public Schema schema() {
-    return schema;
   }
 
   public String schemaName() {
     return schema.name();
-  }
-
-  public Map<String, String> schemaParameters() {
-    return schema.parameters();
   }
 
   public Schema.Type schemaType() {
@@ -52,24 +40,4 @@ public class SinkRecordField {
     return name;
   }
 
-  public boolean isOptional() {
-    return !isPrimaryKey && schema.isOptional();
-  }
-
-  public Object defaultValue() {
-    return schema.defaultValue();
-  }
-
-  public boolean isPrimaryKey() {
-    return isPrimaryKey;
-  }
-
-  @Override
-  public String toString() {
-    return "SinkRecordField{"
-           + "schema=" + schema
-           + ", name='" + name + '\''
-           + ", isPrimaryKey=" + isPrimaryKey
-           + '}';
-  }
 }

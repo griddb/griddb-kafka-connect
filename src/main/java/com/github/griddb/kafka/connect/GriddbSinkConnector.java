@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package io.confluent.connect.jdbc;
+package com.github.griddb.kafka.connect;
 
-import org.apache.kafka.common.config.Config;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.sink.SinkConnector;
@@ -27,24 +26,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
-import io.confluent.connect.jdbc.sink.JdbcSinkTask;
-import io.confluent.connect.jdbc.util.Version;
+import com.github.griddb.kafka.connect.sink.GriddbSinkConnectorConfig;
+import com.github.griddb.kafka.connect.sink.GriddbSinkTask;
+import com.github.griddb.kafka.connect.util.Utility;
 
-public class JdbcSinkConnector extends SinkConnector {
-  private static final Logger log = LoggerFactory.getLogger(JdbcSinkConnector.class);
+public class GriddbSinkConnector extends SinkConnector {
+  private static final Logger log = LoggerFactory.getLogger(GriddbSinkConnector.class);
 
   private Map<String, String> configProps;
 
+  private static final String DEFAULT_VERSION = "Unknown";
+
+  @Override
   public Class<? extends Task> taskClass() {
-    return JdbcSinkTask.class;
+    return GriddbSinkTask.class;
   }
 
   @Override
   public List<Map<String, String>> taskConfigs(int maxTasks) {
     log.info("Setting task configurations for {} workers.", maxTasks);
     final List<Map<String, String>> configs = new ArrayList<>(maxTasks);
-    for (int i = 0; i < maxTasks; ++i) {
+    for (int i = 0; i < maxTasks; i++) {
       configs.add(configProps);
     }
     return configs;
@@ -61,17 +63,12 @@ public class JdbcSinkConnector extends SinkConnector {
 
   @Override
   public ConfigDef config() {
-    return JdbcSinkConfig.CONFIG_DEF;
-  }
-
-  @Override
-  public Config validate(Map<String, String> connectorConfigs) {
-    // TODO cross-fields validation here: pkFields against the pkMode
-    return super.validate(connectorConfigs);
+    return GriddbSinkConnectorConfig.CONFIG_DEF;
   }
 
   @Override
   public String version() {
-    return Version.getVersion();
+    return Utility.getConfigString("sink_connector_version", DEFAULT_VERSION);
   }
+
 }
