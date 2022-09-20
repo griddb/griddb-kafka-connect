@@ -2,14 +2,12 @@
 
 ## Introduction
 
-```text
 Today's applications and IoT devices are generating a lot of big data. Most of this data is unstructured in nature. For a very long time, relational database management systems have been used to store structured data. These database management systems organize data into tables, which are rows and columns. However, unstructured data cannot be organized well in rows and columns, thus, relational databases are not the best option for storage of unstructured data. NoSQL databases were developed to fill the gaps created by relational databases. They are easy to use for the storage of unstructured data. GridDB is a good example of a NoSQL database. It is well optimized for IoT and Big Data. When using GridDB, you will need to stream data in and out. Apache Kafka is a data streaming platform that can help you to achieve this. In this article, we will be walking you through how to organize communication between different elements of the software system when using Kafka and GridDB database.
-```
 
 ### Apache Kafka connector
-```text
+
 Apache Kafka is a distributed event streaming platform used for data integration, data pipelines, and streaming analytics. It can help you to ingest and process streaming data in real-time. Streaming data refers to the data generated continuously by data sources, sending data records simultaneously. Apache Kafka provides its users with the following functions:
-```
+
 * Publish and subscribe to record streams.
 * Effective storage of record streams in the same order they were generated.
 * Real-time processing of record streams.
@@ -226,7 +224,7 @@ The 1 results had been acquired.
     |cluster.name|GridDB cluster name|   |
     |user|GridDB username|   |
     |password|GridDB user password|   |
-    |notification.member|GridDB notification member list in fix list method|   |
+    |notification.member|GridDB notification member list in fixed list method|   |
     |batch.size|the size of write buffer to GridDB|3000|
     |multiput|using multiput or single put in write buffer|true|
     |container.name.format|using it to change to topic name from GridDB container|$(topic): The default container name is topic name |
@@ -322,7 +320,7 @@ Note:
     |cluster.name|GridDB cluster name|   |
     |user|GridDB username|   |
     |password|GridDB user password|   |
-    |notification.member|GridDB notification member list in fix list method|   |
+    |notification.member|GridDB notification member list in fixed list method|   |
     |containers|list of GridDB containers used by the source connector|   |
     |mode|the mode to import (bulk/timestamp)|   |
     |timestamp.column.name|the list of timestamp column in timestamp mode|   |
