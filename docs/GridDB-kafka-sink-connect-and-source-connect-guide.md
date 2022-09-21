@@ -58,7 +58,7 @@ Apache Kafka combines storage, messaging, and stream processing to facilitate th
     | BYTES                   | GSType.BLOB      |
     | Decimal, Date, Time, Timestamp | GSType.TIMESTAMP |
 
-* In Kafka-connector-JDBC, the primary can be any column, so it is configurable. But in GridDB, the rowkey is the first column, so it is not configurable with GridDB Kafka sink/source connector.
+Note: In GridDB, the rowkey is the first column, so it is not configurable with GridDB Kafka sink/source connector.
 
 ### The relationship between Apache Kafka and GridDB database
 
@@ -219,8 +219,8 @@ The 1 results had been acquired.
     |name|the connector name|   |
     |topics.regex|The list of topics to be format, It is used by the sink connector|   |
     |topics|The name of topics is used by the sink connector|   |
-    |host|GridDB host (can use with both multicast and master node mode)|   |
-    |port|GridDB port (can use with both multicast and master node mode)|   |
+    |host|GridDB host or multicast address|   |
+    |port|GridDB port or multicast port|   |
     |cluster.name|GridDB cluster name|   |
     |user|GridDB username|   |
     |password|GridDB user password|   |
@@ -315,8 +315,8 @@ Note:
     |---|---|---|
     |connector.class|the source connector class|com.github.griddb.GriddbSourceConnector|
     |name|the connector name|   |
-    |host|GridDB host (can use with both multicast and master node mode)|   |
-    |port|GridDB port (can use with both multicast and master node mode)|   |
+    |host|GridDB host or multicast address|   |
+    |port|GridDB port or multicast port|   |
     |cluster.name|GridDB cluster name|   |
     |user|GridDB username|   |
     |password|GridDB user password|   |
