@@ -215,7 +215,7 @@ The 1 results had been acquired.
 
     |Parameter   | Description  | Default Value   |
     |---|---|---|
-    |connector.class|the sink connector class|com.github.griddb.GriddbSinkConnector|
+    |connector.class|the sink connector class|com.github.griddb.kafka.connect.GriddbSinkConnector|
     |name|the connector name|   |
     |topics.regex|The list of topics to be format, It is used by the sink connector|   |
     |topics|The name of topics is used by the sink connector|   |
@@ -313,7 +313,7 @@ Note:
 
     |Parameter   | Description  | Default Value   |
     |---|---|---|
-    |connector.class|the source connector class|com.github.griddb.GriddbSourceConnector|
+    |connector.class|the source connector class|com.github.griddb.kafka.connect.GriddbSourceConnector|
     |name|the connector name|   |
     |host|GridDB host or multicast address|   |
     |port|GridDB port or multicast port|   |
