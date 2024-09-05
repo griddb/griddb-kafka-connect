@@ -43,6 +43,13 @@ public class GriddbSourceConnectorConfig extends AbstractConfig {
     private static final ConfigDef.Range POSITIVE_INT_VALIDATOR = ConfigDef.Range.atLeast(1);
     private static final int POLLING_INTERVAL_DEFAULT = 5000;
     private static final String POLL_INTERVAL_DOC = "Frequency in ms to poll for new data in each table.";
+    /** Batch max row config. */
+    public static final String BATCH_MAX_ROW_CONFIG = "batch.max.rows";
+    /** Batch max row default. */
+    private static final int BATCH_MAX_ROW_DEFAULT = 100;
+    /** Batch max row document. */
+    private static final String BATCH_MAX_ROW_DOC =
+            "Max number of rows to get from Kafka at same time";
 
     public static final String DATABASE_GROUP = "Database";
     public static final String MODE_GROUP = "Mode";
@@ -103,6 +110,7 @@ public class GriddbSourceConnectorConfig extends AbstractConfig {
             .defineInternal(NOTIFICATION_MEMBER_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_PROVIDER_CONFIG, Type.STRING, "", Importance.HIGH)
             .define(POLLING_INTERVAL_CONFIG, Type.INT, POLLING_INTERVAL_DEFAULT, POSITIVE_INT_VALIDATOR, Importance.HIGH, POLL_INTERVAL_DOC)
+            .defineInternal(BATCH_MAX_ROW_CONFIG, Type.INT, BATCH_MAX_ROW_DEFAULT, POSITIVE_INT_VALIDATOR, Importance.HIGH, BATCH_MAX_ROW_DOC)
             .define(CONTAINERS_CONFIG, Type.LIST, Importance.HIGH, CONTAINERS_DOC)
             .define(MODE_CONFIG, Type.STRING, MODE_UNSPECIFIED,
                     ConfigDef.ValidString.in(MODE_UNSPECIFIED, MODE_BULK, MODE_TIMESTAMP), Importance.HIGH, MODE_DOC,
