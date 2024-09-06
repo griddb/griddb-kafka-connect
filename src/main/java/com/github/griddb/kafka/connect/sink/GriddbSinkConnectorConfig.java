@@ -42,6 +42,18 @@ public class GriddbSinkConnectorConfig extends AbstractConfig {
     public static final String NOTIFICATION_PROVIDER_CONFIG = "notification.provider.url";
 
     public static final String USE_MULTIPUT_CONFIG = "multiput";
+    /** Container type config string. */
+    public static final String CONTAINER_TYPE_CONFIG = "container.type";
+    /** Container type option collection. */
+    public static final String CONTAINER_TYPE_COLLECTION = "COLLECTION";
+    /** Container type option time serries. */
+    public static final String CONTAINER_TYPE_TIME_SERIES = "TIME_SERIES";
+    /** Container type default. */
+    public static final String CONTAINER_TYPE_DEFAULT =
+            CONTAINER_TYPE_COLLECTION;
+    /** Container type document. */
+    private static final String CONTAINER_TYPE_DOC = "Specifies the type"
+            + "of container GridDB is collection or time series";
 
     public static final List<String> DEFAULT_KAFKA_PK_NAMES = Collections
             .unmodifiableList(Arrays.asList("__connect_topic", "__connect_partition", "__connect_offset"));
@@ -83,6 +95,10 @@ public class GriddbSinkConnectorConfig extends AbstractConfig {
             .defineInternal(PASSWORD_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_MEMBER_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_PROVIDER_CONFIG, Type.STRING, "", Importance.HIGH)
+            .define(CONTAINER_TYPE_CONFIG, Type.STRING, CONTAINER_TYPE_DEFAULT,
+                    ConfigDef.ValidString.in(CONTAINER_TYPE_COLLECTION,
+                    CONTAINER_TYPE_TIME_SERIES), Importance.HIGH,
+                    CONTAINER_TYPE_DOC)
             .define(CONTAINER_NAME_FORMAT, ConfigDef.Type.STRING, CONTAINER_NAME_FORMAT_DEFAULT,
                     ConfigDef.Importance.MEDIUM, CONTAINER_NAME_FORMAT_DOC, DATAMAPPING_GROUP, 1, ConfigDef.Width.LONG,
                     CONTAINER_NAME_FORMAT_DISPLAY)

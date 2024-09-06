@@ -44,6 +44,7 @@ import com.toshiba.mwcloud.gs.RowSet;
 import com.toshiba.mwcloud.gs.TimestampUtils;
 
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema.Type;
@@ -151,6 +152,24 @@ public class GriddbDatabaseDialect implements DbDialect {
     public Container<?, Row> putContainer(String containerName, Collection<SinkRecordField> fields) throws GSException {
 
         ContainerType type = ContainerType.COLLECTION;
+        String containerType =
+            config.getString(GriddbSinkConnectorConfig.CONTAINER_TYPE_CONFIG);
+
+        switch (containerType) {
+            case GriddbSinkConnectorConfig.CONTAINER_TYPE_COLLECTION:
+                break;
+            case GriddbSinkConnectorConfig.CONTAINER_TYPE_TIME_SERIES:
+                if (fields.size() > 0) {
+                    SinkRecordField firstColumn = fields.stream().findFirst().get();
+                    if (this.getGsType(firstColumn) == GSType.TIMESTAMP) {
+                        type = ContainerType.TIME_SERIES;
+                    }
+                }
+                break;
+            default:
+                throw new ConfigException("Invalid type: " + containerType);
+        }
+
         List<ColumnInfo> columnInfoList = new ArrayList<>();
         boolean rowKeyAssigned = true;
         boolean modifiable = true;

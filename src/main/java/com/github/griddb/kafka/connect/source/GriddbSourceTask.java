@@ -99,12 +99,16 @@ public class GriddbSourceTask extends SourceTask {
             }
 
             final List<SourceRecord> results = new ArrayList<>();
+            final int batchMaxRow =
+                config.getInt(GriddbSourceConnectorConfig.BATCH_MAX_ROW_CONFIG);
+
             boolean hadNext = true;
             try {
                 querier.startQuery();
-
-                while (hadNext = querier.hasNext()) {
+                hadNext = querier.hasNext();
+                while (hadNext && (results.size() < batchMaxRow)) {
                     results.add(querier.extractRecord());
+                    hadNext = querier.hasNext();
                 }
             } catch (GSException e) {
                 LOG.error("Failed to run query for container {}: {}", querier.toString(), e);

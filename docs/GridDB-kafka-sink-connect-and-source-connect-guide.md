@@ -88,19 +88,19 @@ Note: Please refer to an example in GridDB written for 2 modes as below.
 
 Building of the library and execution of the sample programs have been checked in the following environment.
 
-    OS: CentOS 7.9(x64)/Ubuntu 20.04
-    Java: 1.8
-    Maven: 3.5.0
-    Kafka: 2.12-3.2.0
-    GridDB server: V5.0 CE
+    OS: Ubuntu 24.04(x64)
+    Java: 17
+    Maven: 3.9.5
+    Kafka: 2.13-3.7.1
+    GridDB server: V5.6 CE, Ubuntu 22.04(x64)
 
 ### Install and start Apache Kafka
 
 ```console
-$ wget https://dlcdn.apache.org/kafka/3.2.0/kafka_2.12-3.2.0.tgz
-$ tar xzvf kafka_2.12-3.2.0.tgz
-$ cd kafka_2.12-3.2.0
-$ export PATH=$PATH:/path/to/kafka_2.12-3.2.0/bin
+$ wget https://dlcdn.apache.org/kafka/3.2.0/kafka_2.13-3.7.1.tgz
+$ tar xzvf kafka_2.13-3.7.1.tgz
+$ cd kafka_2.13-3.7.1
+$ export PATH=$PATH:/path/to/kafka_2.13-3.7.1/bin
 $ zookeeper-server-start.sh -daemon config/zookeeper.properties # Start zookeeper server
 $ kafka-server-start.sh config/server.properties # Start Apache Kafka server
 ```
@@ -134,7 +134,7 @@ Note:
 
 2. After using command `$ mvn clean install`, file griddb-kafka-connector-X.X.jar will be created in "target/" folder.
 
-3. Copy the griddb-kafka-connector-X.X.jar file to /path/to/kafka_2.12-3.2.0/libs/
+3. Copy the griddb-kafka-connector-X.X.jar file to /path/to/kafka_2.13-3.7.1/libs/
 
 ## About GridDB Kafka sink connector
 
@@ -156,7 +156,7 @@ Note:
     ```
 * Export PATH for executing script_sink.sh
     ```console
-    $ export PATH=$PATH:/path/to/kafka_2.12-3.2.0/bin
+    $ export PATH=$PATH:/path/to/kafka_2.13-3.7.1/bin
     ```
 * Run script_sink.sh for Apache Kafka
 
@@ -184,7 +184,7 @@ Note:
     ```
 2. Open a new terminal for executing this command:
     ```console
-    $ cd kafka_2.12-3.2.0
+    $ cd kafka_2.13-3.7.1
     $ ./bin/connect-standalone.sh config/connect-standalone.properties GRIDDB_KAFKA_CONNECTOR_FOLDER/config/griddb-sink.properties
     ```
 3. After finishing the command above, data/topic was pushed into GridDB database.
@@ -228,7 +228,8 @@ The 1 results had been acquired.
     |batch.size|the size of write buffer to GridDB|3000|
     |multiput|using multiput or single put in write buffer|true|
     |container.name.format|using it to change to topic name from GridDB container|$(topic): The default container name is topic name |
-
+    |container.type|The GridDB container type. Choose either `COLLECTION` or `TIME_SERIES`. The TIME_SERIES container will be created when the `container.type` is TIME_SERIES and the first column is TIMESTAMP, otherwise the COLLECTION container will be created.|COLLECTION |
+    
     Note:
     * In file config/griddb-sink.properties: config values (connector.class, name, topics.regex or topics, transforms) are the properties used by Apache Kafka, not the connector).
     * Just configure one property between "topics.regex" and "topics".
@@ -277,7 +278,7 @@ Note:
 
 2. Open new terminal for executing commands:
     ```console
-    $ cd kafka_2.12-3.2.0
+    $ cd kafka_2.13-3.7.1
     $ ./bin/connect-standalone.sh config/connect-standalone.properties GRIDDB_KAFKA_CONNECTOR_FOLDER/config/griddb-source.properties
     ```
 Note:
@@ -311,21 +312,22 @@ Note:
 
 * GridDB Kafka source connector config parameters in the config file
 
-    |Parameter   | Description  | Default Value   |
-    |---|---|---|
-    |connector.class|the source connector class|com.github.griddb.kafka.connect.GriddbSourceConnector|
-    |name|the connector name|   |
-    |host|GridDB host or multicast address|   |
-    |port|GridDB port or multicast port|   |
-    |cluster.name|GridDB cluster name|   |
-    |user|GridDB username|   |
-    |password|GridDB user password|   |
-    |notification.member|GridDB notification member list in fixed list method|   |
-    |containers|list of GridDB containers used by the source connector|   |
-    |mode|the mode to import (bulk/timestamp)|   |
-    |timestamp.column.name|the list of timestamp column in timestamp mode|   |
-    |topic.prefix|the prefix of output topic|   |
-    |polling.interval.ms|interval time for GridDB Kafka source connector to poll data|5000|
+    | Parameter             | Description                                                  | Default Value                                         |
+    | --------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
+    | connector.class       | the source connector class                                   | com.github.griddb.kafka.connect.GriddbSourceConnector |
+    | name                  | the connector name                                           |                                                       |
+    | host                  | GridDB host or multicast address                             |                                                       |
+    | port                  | GridDB port or multicast port                                |                                                       |
+    | cluster.name          | GridDB cluster name                                          |                                                       |
+    | user                  | GridDB username                                              |                                                       |
+    | password              | GridDB user password                                         |                                                       |
+    | notification.member   | GridDB notification member list in fixed list method         |                                                       |
+    | containers            | list of GridDB containers used by the source connector       |                                                       |
+    | mode                  | the mode to import (bulk/timestamp)                          |                                                       |
+    | timestamp.column.name | the list of timestamp column in timestamp mode               |                                                       |
+    | batch.max.rows        | The maximum rows for a batch                                 | 100                                                   |
+    | topic.prefix          | the prefix of output topic                                   |                                                       |
+    | polling.interval.ms   | interval time for GridDB Kafka source connector to poll data | 5000                                                  |
 
     Note: 
     * In file config/griddb-source.properties: the config values (connector.class, name is the properties used by Kafka, not the connector).

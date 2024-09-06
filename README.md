@@ -8,11 +8,11 @@ The Griddb Kafka Connector is a Kafka Connector for loading data to and from Gri
 
 Building of the library and execution of the sample programs have been checked in the following environment.
 
-    OS: CentOS 7.9(x64) / Ubuntu 20.04(x64)
-    Java: 1.8
-    Maven: 3.5.0
-    Kafka: 2.12-3.2.0
-    GridDB server: V5.0 CE
+    OS: Ubuntu 24.04(x64)
+    Java: 17
+    Maven: 3.9.5
+    Kafka: 2.13-3.7.1
+    GridDB server: V5.6 CE, Ubuntu 22.04(x64)
 
 # Build
 
