@@ -39,6 +39,8 @@
                 <version>3.8.1</version>
                 <inherited>true</inherited>
                 <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
                     <compilerArgs>
                         <arg>-Xlint:all</arg>
                         <arg>-Werror</arg>
