@@ -97,7 +97,7 @@ Building of the library and execution of the sample programs have been checked i
 ### Install and start Apache Kafka
 
 ```console
-$ wget https://dlcdn.apache.org/kafka/3.2.0/kafka_2.13-3.7.1.tgz
+$ wget https://dlcdn.apache.org/kafka/3.7.1/kafka_2.13-3.7.1.tgz
 $ tar xzvf kafka_2.13-3.7.1.tgz
 $ cd kafka_2.13-3.7.1
 $ export PATH=$PATH:/path/to/kafka_2.13-3.7.1/bin
