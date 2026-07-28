@@ -31,7 +31,6 @@ import com.toshiba.mwcloud.gs.GSException;
 import com.github.griddb.kafka.connect.util.Utility;
 
 import org.apache.kafka.common.config.ConfigException;
-import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -52,11 +51,13 @@ public class GriddbSourceTask extends SourceTask {
     private PriorityQueue<ContainerQuerier> containerQueue = new PriorityQueue<ContainerQuerier>();
     private final AtomicBoolean running = new AtomicBoolean(false);
     private int pollIntervalDefault;
+
     /**
      * The constructor method
      */
     public GriddbSourceTask() {
-        this.time = new SystemTime();
+        // this.time = new SystemTime();
+        this.time = Time.SYSTEM;
     }
 
     /**
@@ -99,8 +100,7 @@ public class GriddbSourceTask extends SourceTask {
             }
 
             final List<SourceRecord> results = new ArrayList<>();
-            final int batchMaxRow =
-                config.getInt(GriddbSourceConnectorConfig.BATCH_MAX_ROW_CONFIG);
+            final int batchMaxRow = config.getInt(GriddbSourceConnectorConfig.BATCH_MAX_ROW_CONFIG);
 
             boolean hadNext = true;
             try {

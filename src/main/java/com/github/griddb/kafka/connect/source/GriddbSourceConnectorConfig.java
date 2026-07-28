@@ -37,6 +37,8 @@ public class GriddbSourceConnectorConfig extends AbstractConfig {
     public static final String CLUSTERNAME_CONFIG = "cluster.name";
     public static final String USER_CONFIG = "user";
     public static final String PASSWORD_CONFIG = "password";
+    public static final String CONNECTION_ROUTE_CONFIG = "connection.route";
+    public static final String DATABASE_CONFIG = "database";
     public static final String NOTIFICATION_MEMBER_CONFIG = "notification.member";
     public static final String NOTIFICATION_PROVIDER_CONFIG = "notification.provider.url";
     public static final String POLLING_INTERVAL_CONFIG = "poll.interval.ms";
@@ -48,8 +50,7 @@ public class GriddbSourceConnectorConfig extends AbstractConfig {
     /** Batch max row default. */
     private static final int BATCH_MAX_ROW_DEFAULT = 100;
     /** Batch max row document. */
-    private static final String BATCH_MAX_ROW_DOC =
-            "Max number of rows to get from Kafka at same time";
+    private static final String BATCH_MAX_ROW_DOC = "Max number of rows to get from Kafka at same time";
 
     public static final String DATABASE_GROUP = "Database";
     public static final String MODE_GROUP = "Mode";
@@ -107,10 +108,14 @@ public class GriddbSourceConnectorConfig extends AbstractConfig {
             .defineInternal(CLUSTERNAME_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(USER_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(PASSWORD_CONFIG, Type.STRING, "", Importance.HIGH)
+            .defineInternal(CONNECTION_ROUTE_CONFIG, Type.STRING, "", Importance.HIGH)
+            .defineInternal(DATABASE_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_MEMBER_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_PROVIDER_CONFIG, Type.STRING, "", Importance.HIGH)
-            .define(POLLING_INTERVAL_CONFIG, Type.INT, POLLING_INTERVAL_DEFAULT, POSITIVE_INT_VALIDATOR, Importance.HIGH, POLL_INTERVAL_DOC)
-            .defineInternal(BATCH_MAX_ROW_CONFIG, Type.INT, BATCH_MAX_ROW_DEFAULT, POSITIVE_INT_VALIDATOR, Importance.HIGH, BATCH_MAX_ROW_DOC)
+            .define(POLLING_INTERVAL_CONFIG, Type.INT, POLLING_INTERVAL_DEFAULT, POSITIVE_INT_VALIDATOR,
+                    Importance.HIGH, POLL_INTERVAL_DOC)
+            .defineInternal(BATCH_MAX_ROW_CONFIG, Type.INT, BATCH_MAX_ROW_DEFAULT, POSITIVE_INT_VALIDATOR,
+                    Importance.HIGH, BATCH_MAX_ROW_DOC)
             .define(CONTAINERS_CONFIG, Type.LIST, Importance.HIGH, CONTAINERS_DOC)
             .define(MODE_CONFIG, Type.STRING, MODE_UNSPECIFIED,
                     ConfigDef.ValidString.in(MODE_UNSPECIFIED, MODE_BULK, MODE_TIMESTAMP), Importance.HIGH, MODE_DOC,
@@ -118,10 +123,12 @@ public class GriddbSourceConnectorConfig extends AbstractConfig {
             .defineInternal(TOPIC_PREFIX_CONFIG, Type.STRING, TOPIC_PREFIX_DOC, Importance.HIGH)
             .define(TIMESTAMP_COLUMN_NAME_CONFIG, Type.LIST, TIMESTAMP_COLUMN_NAME_DEFAULT, Importance.MEDIUM,
                     TIMESTAMP_COLUMN_NAME_DOC, MODE_GROUP, 2, Width.MEDIUM, TIMESTAMP_COLUMN_NAME_DISPLAY);
+
     @SuppressWarnings("CPD-END")
 
     /**
      * The constructor method
+     * 
      * @param props : config parameters
      */
     public GriddbSourceConnectorConfig(Map<String, ?> props) {

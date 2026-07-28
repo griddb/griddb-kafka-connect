@@ -81,6 +81,8 @@ public class GriddbDatabaseDialect implements DbDialect {
         String password = config.getString(GriddbSinkConnectorConfig.PASSWORD_CONFIG);
         String notificationMember = config.getString(GriddbSinkConnectorConfig.NOTIFICATION_MEMBER_CONFIG);
         String notificationProviderUrl = config.getString(GriddbSinkConnectorConfig.NOTIFICATION_PROVIDER_CONFIG);
+        String connectionRoute = config.getString(GriddbSinkConnectorConfig.CONNECTION_ROUTE_CONFIG);
+        String database = config.getString(GriddbSinkConnectorConfig.DATABASE_CONFIG);
 
         Properties gsprops = new Properties();
         boolean isMulticast = this.isMulticast(host);
@@ -108,6 +110,12 @@ public class GriddbDatabaseDialect implements DbDialect {
         }
         if (notificationProviderUrl.length() > 0) {
             gsprops.setProperty("notificationProvider", notificationProviderUrl);
+        }
+        if (connectionRoute.length() > 0) {
+            gsprops.setProperty("connectionRoute", connectionRoute);
+        }
+        if (database.length() > 0) {
+            gsprops.setProperty("database", database);
         }
 
         try {
@@ -152,8 +160,7 @@ public class GriddbDatabaseDialect implements DbDialect {
     public Container<?, Row> putContainer(String containerName, Collection<SinkRecordField> fields) throws GSException {
 
         ContainerType type = ContainerType.COLLECTION;
-        String containerType =
-            config.getString(GriddbSinkConnectorConfig.CONTAINER_TYPE_CONFIG);
+        String containerType = config.getString(GriddbSinkConnectorConfig.CONTAINER_TYPE_CONFIG);
 
         switch (containerType) {
             case GriddbSinkConnectorConfig.CONTAINER_TYPE_COLLECTION:

@@ -40,6 +40,8 @@ public class GriddbSinkConnectorConfig extends AbstractConfig {
     public static final String PASSWORD_CONFIG = "password";
     public static final String NOTIFICATION_MEMBER_CONFIG = "notification.member";
     public static final String NOTIFICATION_PROVIDER_CONFIG = "notification.provider.url";
+    public static final String CONNECTION_ROUTE_CONFIG = "connection.route";
+    public static final String DATABASE_CONFIG = "database";
 
     public static final String USE_MULTIPUT_CONFIG = "multiput";
     /** Container type config string. */
@@ -49,8 +51,7 @@ public class GriddbSinkConnectorConfig extends AbstractConfig {
     /** Container type option time serries. */
     public static final String CONTAINER_TYPE_TIME_SERIES = "TIME_SERIES";
     /** Container type default. */
-    public static final String CONTAINER_TYPE_DEFAULT =
-            CONTAINER_TYPE_COLLECTION;
+    public static final String CONTAINER_TYPE_DEFAULT = CONTAINER_TYPE_COLLECTION;
     /** Container type document. */
     private static final String CONTAINER_TYPE_DOC = "Specifies the type"
             + "of container GridDB is collection or time series";
@@ -95,21 +96,28 @@ public class GriddbSinkConnectorConfig extends AbstractConfig {
             .defineInternal(PASSWORD_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_MEMBER_CONFIG, Type.STRING, "", Importance.HIGH)
             .defineInternal(NOTIFICATION_PROVIDER_CONFIG, Type.STRING, "", Importance.HIGH)
+            .defineInternal(CONNECTION_ROUTE_CONFIG, Type.STRING, "", Importance.HIGH)
+            .defineInternal(DATABASE_CONFIG, Type.STRING, "", Importance.HIGH)
             .define(CONTAINER_TYPE_CONFIG, Type.STRING, CONTAINER_TYPE_DEFAULT,
                     ConfigDef.ValidString.in(CONTAINER_TYPE_COLLECTION,
-                    CONTAINER_TYPE_TIME_SERIES), Importance.HIGH,
+                            CONTAINER_TYPE_TIME_SERIES),
+                    Importance.HIGH,
                     CONTAINER_TYPE_DOC)
             .define(CONTAINER_NAME_FORMAT, ConfigDef.Type.STRING, CONTAINER_NAME_FORMAT_DEFAULT,
-                    ConfigDef.Importance.MEDIUM, CONTAINER_NAME_FORMAT_DOC, DATAMAPPING_GROUP, 1, ConfigDef.Width.LONG,
+                    ConfigDef.Importance.MEDIUM, CONTAINER_NAME_FORMAT_DOC, DATAMAPPING_GROUP, 1,
+                    ConfigDef.Width.LONG,
                     CONTAINER_NAME_FORMAT_DISPLAY)
             .define(BATCH_SIZE, ConfigDef.Type.INT, BATCH_SIZE_DEFAULT, NON_NEGATIVE_INT_VALIDATOR,
-                    ConfigDef.Importance.MEDIUM, BATCH_SIZE_DOC, WRITES_GROUP, 2, ConfigDef.Width.SHORT,
+                    ConfigDef.Importance.MEDIUM, BATCH_SIZE_DOC, WRITES_GROUP, 2,
+                    ConfigDef.Width.SHORT,
                     BATCH_SIZE_DISPLAY)
             .defineInternal(USE_MULTIPUT_CONFIG, Type.BOOLEAN, "true", Importance.LOW);
+
     @SuppressWarnings("CPD-END")
 
     /**
      * The constructor method
+     * 
      * @param props : properties from config file
      */
     public GriddbSinkConnectorConfig(Map<?, ?> props) {
